@@ -1,4 +1,4 @@
-use log::{ debug, info, error };
+use log::{ info, error };
 
 use rocket::{Data, Outcome};
 use rocket::data;
@@ -6,21 +6,21 @@ use rocket::data::FromDataSimple;
 use rocket::http::Status;
 use rocket::request::Request;
 //use rocket_contrib::json::Json;
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use std::io::prelude::*;
 //use tinytemplate::TinyTemplate;
 //use std::error::Error;
-use rocket::response::Debug;
+//use rocket::response::Debug;
 
 
-#[derive(Debug, Serialize)]
-struct Context {
-    clone_url: String,
-    build_id: String,
-    build_image: String,
-    command: String,
-    build_mount_path: String
-}
+// #[derive(Debug, Serialize)]
+// struct Context {
+//     clone_url: String,
+//     build_id: String,
+//     build_image: String,
+//     command: String,
+//     build_mount_path: String
+// }
 
 #[derive(Debug, Deserialize)]
 struct Repository {
@@ -99,13 +99,8 @@ fn is_valid_signature(signature: &str, body: &str, secret: &str) -> bool {
     }
 }
 
-use futures::{StreamExt, TryStreamExt};
-use rocket::response::status;
-use futures::executor::block_on;
-// Result<(), Debug<kube::Error>>
-
-
-
+//use rocket::response::status;
+//use futures::executor::block_on;
 #[post("/build", data = "<payload>")]
 pub fn build(payload: SignedPayload) -> Status
 {
@@ -113,9 +108,6 @@ pub fn build(payload: SignedPayload) -> Status
     let event: GitHubEvent = serde_json::from_str(payload.0.as_str()).unwrap();
     info!("Received GitHub event for {:?}", event.repository.full_name);
     info!("{:?}", event);
-
-
-
 
     match deploy_build_job(&event) {
         Ok(_) => Status::Accepted,
@@ -129,7 +121,7 @@ pub fn build(payload: SignedPayload) -> Status
 
 
 
-use kube::api::{Api, ListParams, PostParams, Meta, WatchEvent };
+use kube::api::{Api, PostParams}; //, Meta, WatchEvent };
 use kube::{Config, Client};
 use k8s_openapi::api::batch::v1::Job;
 
@@ -158,8 +150,15 @@ async fn deploy_build_job(event: &GitHubEvent) -> Result<(), kube::Error>
                 "spec": {
                     "containers": [{
                         "name": "empty",
-                        "image": "alpine/git:latest",
-                        "command": ["sleep", "15"]
+                        "image": "p80n/build-tomo-job:latest",
+                        "imagePullPolicy": "Always",  // FIXME
+                        "command": ["sleep", "300"],
+                        "env": [
+                            { "name": "REPOSITORY_URL",
+                               "value": event.repository.clone_url },
+                            { "name": "COMMIT_HASH",
+                               "value": event.head_commit.id } ],
+                        "securityContext": { "procMount": "Unmasked" }
                     }],
                     "restartPolicy": "Never",
                 }
@@ -174,3 +173,12 @@ async fn deploy_build_job(event: &GitHubEvent) -> Result<(), kube::Error>
     Ok(())
 }
 
+fn build_image_name() -> String {
+    match std::env::var("BUILD_IMAGE") {
+        Ok(s) => s,
+        Err(e) => {
+            error!("BUILD_IMAGE not set");
+            std::process:exit(1)
+        }
+    }
+}

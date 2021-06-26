@@ -1,6 +1,6 @@
 use rocket::local::Client;
 use rocket::http::{Header, Status};
-use rocket::response::status;
+//use rocket::response::status;
 use std::fs;
 
 use build_tomo_rs;
@@ -41,7 +41,7 @@ fn test_build_success() {
     std::env::set_var("GITHUB_WEBHOOK_SECRET", "asdfASDF1234");
     let mut payload = fs::read_to_string("tests/data/github_webhook_payload.json").unwrap();
     let client = Client::new(build_tomo_rs::rocket()).expect("valid rocket instance");
-    payload = fs::read_to_string("tests/data/github_webhook_payload.json").unwrap();
+//    payload = fs::read_to_string("tests/data/github_webhook_payload.json").unwrap();
     let response = client.post("/build")
         .body(&payload)
         .header(Header::new("X-HUB-SIGNATURE-256", "b73839efb85fe05c79bee1cec3b29ecc0639074c97d27bd74aed202ed5c415fb"))
